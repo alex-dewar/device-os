@@ -133,6 +133,12 @@ typedef enum
      */
     SYSTEM_FLAG_RESET_NETWORK_ON_CLOUD_ERRORS,
 
+	/**
+	 * When 0, OTA updates are only applied when SYSTEM_FLAG_OTA_UPDATE_ENABLED is set.
+	 * When 1, OTA updates are applied irrespective of the value of SYSTEM_FLAG_OTA_UPDATE_ENABLED.
+	 */
+	SYSTEM_FLAG_OTA_UPDATE_FORCED,
+
     SYSTEM_FLAG_MAX
 
 } system_flag_t;
