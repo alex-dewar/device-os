@@ -12,14 +12,90 @@
 
 #ifndef USE_SPI
 #error Define USE_SPI
-#endif
+#endif // #ifndef USE_SPI
 
 #ifndef USE_CS
 #error Define USE_CS
-#endif
+#endif // #ifndef USE_CS
+
+#if HAL_PLATFORM_NRF52840
+#if (PLATFORM_ID == PLATFORM_ARGON_SOM) || (PLATFORM_ID == PLATFORM_BORON_SOM) || (PLATFORM_ID == PLATFORM_XENON_SOM)
+
+#if (USE_SPI == 0 || USE_SPI == 255) // default to SPI
+#define _SPI SPI
+#define _CS D8
+#pragma message "Compiling for SPI, _CS set to D8"
+#elif (USE_SPI == 1)
+#define _SPI SPI1
+#define _CS D5
+#pragma message "Compiling for SPI1, _CS set to D5"
+#elif (USE_SPI == 2)
+#error "SPI2 not supported for xenon-som, argon-som or boron-som"
+#else
+#error "Not supported for Gen 3"
+#endif // (USE_SPI == 0 || USE_SPI == 255)
+
+#else // xenon, argon, boron
+
+#if (USE_SPI == 0 || USE_SPI == 255) // default to SPI
+#define _SPI SPI
+#define _CS D14
+#pragma message "Compiling for SPI, _CS set to D14"
+#elif (USE_SPI == 1)
+#define _SPI SPI1
+#define _CS D5
+#pragma message "Compiling for SPI1, _CS set to D5"
+#elif (USE_SPI == 2)
+#error "SPI2 not supported for xenon, argon or boron"
+#else
+#error "Not supported for Gen 3"
+#endif // (USE_SPI == 0 || USE_SPI == 255)
+
+#endif // #if (PLATFORM_ID == PLATFORM_ARGON_SOM) || (PLATFORM_ID == PLATFORM_BORON_SOM) || (PLATFORM_ID == PLATFORM_XENON_SOM)
+
+#else // Gen 2
+
+#if (USE_SPI == 0 || USE_SPI == 255) // default to SPI
+#define _SPI SPI
+#define _CS A2
+#pragma message "Compiling for SPI, _CS set to A2"
+#elif (USE_SPI == 1)
+#define _SPI SPI1
+#define _CS D5
+#pragma message "Compiling for SPI1, _CS set to D5"
+#elif (USE_SPI == 2)
+#define _SPI SPI2
+#define _CS C0
+#pragma message "Compiling for SPI2, _CS set to C0"
+#else
+#error "Not supported for Gen 2"
+#endif // (USE_SPI == 0)
+
+#endif // #if HAL_PLATFORM_NRF52840
+
+#if defined(_SPI) && (USE_CS != 255)
+#pragma message "Overriding default CS selection"
+#undef _CS
+#if (USE_CS == 0)
+#define _CS A2
+#pragma message "_CS pin set to A2"
+#elif (USE_CS == 1)
+#define _CS D5
+#pragma message "_CS pin set to D5"
+#elif (USE_CS == 2)
+#define _CS D8
+#pragma message "_CS pin set to D8"
+#elif (USE_CS == 3)
+#define _CS D14
+#pragma message "_CS pin set to D14"
+#elif (USE_CS == 4)
+#define _CS C0
+#pragma message "_CS pin set to C0"
+#endif // (USE_CS == 0)
+#endif // defined(_SPI) && (USE_CS != 255)
 
 /*
- * Wiring diagrams
+ * Gen 2 Wiring diagrams
  *
  * SPI/SPI                        SPI1/SPI                       SPI2/SPI
  * Master: SPI (USE_SPI=SPI)      Master: SPI1 (USE_SPI=SPI1)    Master: SPI2 (USE_SPI=SPI2)
@@ -56,7 +132,37 @@
  * CS   A2 <---------> C0 CS      CS   D5 <---------> C0 CS      CS   C0 <---------> C0 CS
  *
  *********************************************************************************************
+ *
+ * Gen 3 SoM Wiring diagrams
+ *
+ * SPI/SPI1                       SPI1/SPI1
+ * Master: SPI  (USE_SPI=SPI)     Master: SPI1 (USE_SPI=SPI1)
+ * Slave:  SPI1 (USE_SPI=SPI1)    Slave:  SPI1 (USE_SPI=SPI1)
+ *
+ * Master             Slave       Master              Slave
+ * MOSI D8  <-------> D5 MOSI     MOSI D5 <---------> D5 MOSI
+ * MISO D11 <-------> D4 MISO     MISO D4 <---------> D4 MISO
+ * SCK  D12 <-------> D3 SCK      SCK  D3 <---------> D3 SCK
+ * CS   D13 <-------> D2 CS       CS   D2 <---------> D2 CS
+ *
+ *********************************************************************************************
+ *
+ * Gen 3 Non-SoM Wiring diagrams
+ *
+ * SPI/SPI1                       SPI1/SPI1
+ * Master: SPI  (USE_SPI=SPI)     Master: SPI1 (USE_SPI=SPI1)
+ * Slave:  SPI1 (USE_SPI=SPI1)    Slave:  SPI1 (USE_SPI=SPI1)
+ *
+ * Master             Slave       Master              Slave
+ * MOSI D14 <-------> D5 MOSI     MOSI D5 <---------> D5 MOSI
+ * MISO D11 <-------> D4 MISO     MISO D4 <---------> D4 MISO
+ * SCK  D12 <-------> D3 SCK      SCK  D3 <---------> D3 SCK
+ * CS   D13 <-------> D2 CS       CS   D2 <---------> D2 CS
+ *
+ *********************************************************************************************
  */
+
+#ifdef _SPI
 
 static uint8_t SPI_Master_Tx_Buffer[TRANSFER_LENGTH_2];
 static uint8_t SPI_Master_Rx_Buffer[TRANSFER_LENGTH_2];
@@ -64,14 +170,14 @@ static volatile uint8_t DMA_Completed_Flag = 0;
 
 static void SPI_Master_Configure()
 {
-    if (!USE_SPI.isEnabled()) {
+    if (!_SPI.isEnabled()) {
         // Run SPI bus at 1 MHz, so that this test works reliably even if the
         // devices are connected with jumper wires
-        USE_SPI.setClockSpeed(1, MHZ);
-        USE_SPI.begin(USE_CS);
+        _SPI.setClockSpeed(1, MHZ);
+        _SPI.begin(_CS);
 
         // Clock dummy byte just in case
-        (void)USE_SPI.transfer(0xff);
+        (void)_SPI.transfer(0xff);
     }
 }
 
@@ -83,7 +189,7 @@ static void SPI_DMA_Completed_Callback()
 static void SPI_Master_Transfer_No_DMA(uint8_t* txbuf, uint8_t* rxbuf, int length) {
     for(int count = 0; count < length; count++)
     {
-        uint8_t tmp = USE_SPI.transfer(txbuf ? txbuf[count] : 0xff);
+        uint8_t tmp = _SPI.transfer(txbuf ? txbuf[count] : 0xff);
         if (rxbuf)
             rxbuf[count] = tmp;
     }
@@ -92,12 +198,12 @@ static void SPI_Master_Transfer_No_DMA(uint8_t* txbuf, uint8_t* rxbuf, int lengt
 static void SPI_Master_Transfer_DMA(uint8_t* txbuf, uint8_t* rxbuf, int length, HAL_SPI_DMA_UserCallback cb) {
     if (cb) {
         DMA_Completed_Flag = 0;
-        USE_SPI.transfer(txbuf, rxbuf, length, cb);
+        _SPI.transfer(txbuf, rxbuf, length, cb);
         while(DMA_Completed_Flag == 0);
-        assertEqual(length, USE_SPI.available());
+        assertEqual(length, _SPI.available());
     } else {
-        USE_SPI.transfer(txbuf, rxbuf, length, NULL);
-        assertEqual(length, USE_SPI.available());
+        _SPI.transfer(txbuf, rxbuf, length, NULL);
+        assertEqual(length, _SPI.available());
     }
 }
 
@@ -113,7 +219,7 @@ bool SPI_Master_Slave_Change_Mode(uint8_t mode, uint8_t bitOrder, std::function<
     memset(SPI_Master_Rx_Buffer, 0, sizeof(SPI_Master_Rx_Buffer));
 
     // Select
-    digitalWrite(USE_CS, LOW);
+    digitalWrite(_CS, LOW);
     delay(SPI_DELAY);
 
     memcpy(SPI_Master_Tx_Buffer, MASTER_TEST_MESSAGE, sizeof(MASTER_TEST_MESSAGE));
@@ -123,14 +229,14 @@ bool SPI_Master_Slave_Change_Mode(uint8_t mode, uint8_t bitOrder, std::function<
 
     transferFunc(SPI_Master_Tx_Buffer, SPI_Master_Rx_Buffer, TRANSFER_LENGTH_1);
 
-    digitalWrite(USE_CS, HIGH);
+    digitalWrite(_CS, HIGH);
     delay(SPI_DELAY * 10);
 
     bool ret = (strncmp((const char *)SPI_Master_Rx_Buffer, SLAVE_TEST_MESSAGE_1, sizeof(SLAVE_TEST_MESSAGE_1)) == 0);
 
     // Apply new settings here
-    USE_SPI.setDataMode(mode);
-    USE_SPI.setBitOrder(bitOrder);
+    _SPI.setDataMode(mode);
+    _SPI.setBitOrder(bitOrder);
     SPI_Master_Configure();
 
     return ret;
@@ -151,14 +257,14 @@ void SPI_Master_Slave_Master_Test_Routine(std::function<void(uint8_t*, uint8_t*,
         memset(SPI_Master_Rx_Buffer, 0, sizeof(SPI_Master_Rx_Buffer));
 
         // Select
-        digitalWrite(USE_CS, LOW);
+        digitalWrite(_CS, LOW);
         delay(SPI_DELAY);
 
         memcpy(SPI_Master_Tx_Buffer, MASTER_TEST_MESSAGE, sizeof(MASTER_TEST_MESSAGE));
         memcpy(SPI_Master_Tx_Buffer + sizeof(MASTER_TEST_MESSAGE), (void*)&requestedLength, sizeof(uint32_t));
 
         transferFunc(SPI_Master_Tx_Buffer, SPI_Master_Rx_Buffer, TRANSFER_LENGTH_1);
-        digitalWrite(USE_CS, HIGH);
+        digitalWrite(_CS, HIGH);
         // Serial.print("< ");
         // Serial.println((const char *)SPI_Master_Rx_Buffer);
         assertTrue(strncmp((const char *)SPI_Master_Rx_Buffer, SLAVE_TEST_MESSAGE_1, sizeof(SLAVE_TEST_MESSAGE_1)) == 0);
@@ -167,7 +273,7 @@ void SPI_Master_Slave_Master_Test_Routine(std::function<void(uint8_t*, uint8_t*,
         if (requestedLength == 0)
             break;
 
-        digitalWrite(USE_CS, LOW);
+        digitalWrite(_CS, LOW);
         delay(SPI_DELAY);
 
         // Received a good first reply from Slave
@@ -175,7 +281,7 @@ void SPI_Master_Slave_Master_Test_Routine(std::function<void(uint8_t*, uint8_t*,
         memset(SPI_Master_Rx_Buffer, 0, sizeof(SPI_Master_Rx_Buffer));
         transferFunc(NULL, SPI_Master_Rx_Buffer, requestedLength);
         // Deselect
-        digitalWrite(USE_CS, HIGH);
+        digitalWrite(_CS, HIGH);
         delay(SPI_DELAY);
         // Serial.print("< ");
         // Serial.println((const char *)SPI_Master_Rx_Buffer);
@@ -390,3 +496,5 @@ test(23_SPI_Master_Slave_Master_Variable_Length_Transfer_DMA_Synchronous_MODE2_L
     assertTrue(SPI_Master_Slave_Change_Mode(SPI_MODE2, LSBFIRST, transferFunc));
     SPI_Master_Slave_Master_Test_Routine(transferFunc, true);
 }
+
+#endif // #ifdef _SPI
